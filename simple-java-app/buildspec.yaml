@@ -1,0 +1,37 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto17
+      docker: 20
+    commands:
+      - echo "Setting up Java 17..."
+
+  pre_build:
+    commands:
+      - echo "Installing dependencies..."
+      - cd simple-java-app
+      - mvn -B -q dependency:go-offline
+      - echo "Logging into Docker registry..."
+      - echo "$DOCKER_REGISTRY_PASSWORD" | docker login -u "$DOCKER_REGISTRY_USERNAME" --password-stdin "$DOCKER_REGISTRY_URL"
+
+  build:
+    commands:
+      - echo "Running tests..."
+      - mvn -B test
+      - echo "Packaging application..."
+      - mvn -B -DskipTests package
+      - echo "Building Docker image..."
+      - docker build -t "$DOCKER_REGISTRY_URL/$DOCKER_REGISTRY_USERNAME/first-build-project:latest" .
+      - echo "Pushing Docker image..."
+      - docker push "$DOCKER_REGISTRY_URL/$DOCKER_REGISTRY_USERNAME/first-build-project:latest"
+
+  post_build:
+    commands:
+      - echo "Build completed successfully!"
+
+artifacts:
+  files:
+    - '**/*'
+  base-directory: simple-java-app
