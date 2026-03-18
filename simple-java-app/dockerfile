@@ -1,0 +1,28 @@
+# ---------- Build stage ----------
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+WORKDIR /app
+
+# Copy the pom and download dependencies first (better layer caching)
+COPY pom.xml .
+RUN mvn -B -q dependency:go-offline
+
+# Copy the rest of the source and build
+COPY src ./src
+# Build the JAR (skip tests in Docker to speed up; your CI can run tests separately)
+RUN mvn -B -DskipTests package
+
+# ---------- Runtime stage ----------
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+
+# Copy the built JAR from the build stage
+# If your artifact has a specific name, replace the wildcard accordingly
+COPY --from=build /app/target/*.jar app.jar
+
+# Spring Boot defaults to 8080. Change if your app uses a different port.
+EXPOSE 8080
+
+# Optional JVM tuning for containers
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
